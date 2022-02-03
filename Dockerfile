@@ -1,6 +1,6 @@
 FROM rockylinux:8.5
 
-ARG python_version=3.8.8
+ARG python_version=3.8.12
 
 RUN dnf install -y \
   wget \
@@ -9,6 +9,8 @@ RUN dnf install -y \
   zlib-devel \
   openssl-devel \
   libffi-devel
+
+RUN yum -y update && yum clean all
 
 RUN wget https://www.python.org/ftp/python/${python_version}/Python-${python_version}.tgz -O /tmp/python.tgz && \
     tar xvf /tmp/python.tgz -C /tmp && \
