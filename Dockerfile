@@ -1,4 +1,5 @@
-FROM rockylinux:8.5
+ARG ARCH=
+FROM ${ARCH}rockylinux:8.5
 
 ARG python_version=3.8.12
 
@@ -8,6 +9,7 @@ RUN dnf install -y \
   gcc \
   zlib-devel \
   openssl-devel \
+  vim \
   libffi-devel
 
 RUN yum -y update && yum clean all
