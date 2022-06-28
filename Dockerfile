@@ -1,9 +1,9 @@
-ARG ARCH=
-FROM ${ARCH}rockylinux:8.5
+FROM rockylinux/rockylinux:8.6.20220515
 
-ARG python_version=3.8.12
+ARG python_version=3.8.13
 
 RUN dnf install -y \
+  gzip \
   wget \
   make \
   gcc \
