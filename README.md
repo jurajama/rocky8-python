@@ -8,13 +8,13 @@ Available in Dockerhub https://hub.docker.com/r/jurajama/rocky8-python
 
 ## AMD64
 ```
-docker build -t <username>/rocky8-python:amd64 --platform=linux/amd64 .
+docker build -t <username>/rocky8-python:amd64 --build-arg ARCH=amd64/ .
 docker push <username>/rocky8-python:amd64
 ```
 
 ## ARM64
 ```
-docker build -t <username>/rocky8-python:arm64v8 --platform=linux/arm64 .
+docker build -t <username>/rocky8-python:arm64v8 --build-arg ARCH=arm64v8/ .
 docker push <username>/rocky8-python:arm64v8
 ```
 
