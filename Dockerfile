@@ -1,8 +1,10 @@
-FROM rockylinux/rockylinux:8.6.20220515
+ARG ARCH=
+FROM ${ARCH}rockylinux:8.7.20230215
 
-ARG python_version=3.8.13
+ARG python_version=3.11.2
 
 RUN dnf install -y \
+  findutils \
   gzip \
   wget \
   make \
