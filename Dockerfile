@@ -1,7 +1,7 @@
 ARG ARCH=
-FROM ${ARCH}rockylinux:8.7.20230215
+FROM ${ARCH}rockylinux:8.9.20231119
 
-ARG python_version=3.11.2
+ARG python_version=3.11.7
 
 RUN dnf install -y \
   findutils \
