@@ -1,25 +1,27 @@
 # rocky8-python
 Rocky Linux 8 with Python built from source code.
 
-Available in Dockerhub https://hub.docker.com/r/jurajama/rocky8-python
+Built image available in GitHub container registry:
+```
+docker pull ghcr.io/jurajama/rocky8-python:latest
+```
 
-Base image: https://hub.docker.com/r/rockylinux/rockylinux/
+## Building manually
 
-# Build commands for different architectures:
-
-## AMD64
+### AMD64
 ```
 docker buildx build --platform linux/amd64 -t <username>/rocky8-python:amd64 .
 docker push <username>/rocky8-python:amd64
 ```
 
-## ARM64
+### ARM64
 ```
 docker buildx build --platform linux/arm64/v8 -t <username>/rocky8-python:arm64v8 .
 docker push <username>/rocky8-python:arm64v8
 ```
 
-## Create manifest
+### Create manifest
+Manifest is needed to make multi-architecture image available via a single tag.
 ```
 docker manifest create \
 <username>/rocky8-python:latest \
