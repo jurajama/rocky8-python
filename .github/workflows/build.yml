@@ -1,0 +1,71 @@
+name: Build and Push Docker Image
+on:
+  push:
+    paths:
+      - 'Dockerfile'
+      - '.github/workflows/build.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    # This logic of using hard-coded "dev" tag would not work if multiple developers would be working
+    # on the same repository on different branches. Then it would be better to use the branch name in tag.
+    - name: Set image tag based on branch
+      id: set_image_tag
+      run: |
+        if [ "${GITHUB_REF}" == "refs/heads/main" ]; then
+          echo "image_tag=latest" >> $GITHUB_ENV
+        elif [[ "${GITHUB_REF}" == refs/heads/* ]]; then
+          echo "image_tag=dev" >> $GITHUB_ENV
+        fi
+
+    # If the build was triggered by pushing commits to a branch, push the image with the dev/latest tag.
+    - name: Build and push Docker image with dev/latest tag
+      if: ${{ env.image_tag }}
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        push: true
+        platforms: linux/amd64,linux/arm64
+        tags: ghcr.io/jurajama/rocky8-python:${{ env.image_tag }}
+        cache-from: type=gha,scope=${{ github.ref_name }}
+        cache-to: type=gha,mode=max,scope=${{ github.ref_name }}
+        no-cache: ${{ github.ref == 'refs/heads/main' }}
+
+    # If the build was triggered by a tag, extract the version from the tag and push the image with the version tag.
+    - name: Extract version from git tag
+      if: startsWith(github.ref, 'refs/tags/v')
+      id: extract_version
+      run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+
+    - name: Build and push Docker image with version tag
+      if: ${{ env.version }}
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        push: true
+        platforms: linux/amd64,linux/arm64
+        tags: ghcr.io/jurajama/rocky8-python:${{ env.version }}
+        cache-from: type=gha,scope=${{ github.ref_name }}
+        cache-to: type=gha,mode=max,scope=${{ github.ref_name }}
+        no-cache: ${{ github.ref == 'refs/heads/main' }}
