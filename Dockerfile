@@ -1,6 +1,6 @@
 FROM rockylinux/rockylinux:8.10.20240528
 
-ARG python_version=3.11.9
+ARG python_version=3.11.14
 
 RUN dnf install -y \
   findutils \
