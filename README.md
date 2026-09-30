@@ -6,30 +6,36 @@ Built image available in GitHub container registry:
 docker pull ghcr.io/jurajama/rocky8-python:latest
 ```
 
+The image is published as a multi-platform image for `linux/amd64` and `linux/arm64`, so the same tag
+works on both architectures and Docker pulls the matching image automatically.
+
+## Automated builds
+
+The [build workflow](.github/workflows/build.yml) builds both platforms in parallel on native GitHub runners
+(`ubuntu-24.04` for amd64, `ubuntu-24.04-arm` for arm64) and then combines them into a single multi-platform
+manifest list. Tags are assigned as follows:
+
+| Trigger                     | Tag      |
+|-----------------------------|----------|
+| Push to `main`              | `latest` |
+| Push to any other branch    | `dev`    |
+| Git tag `vX.Y.Z`            | `X.Y.Z`  |
+
 ## Building manually
 
-### AMD64
+Build both platforms and push them as a multi-platform image in one step with Docker Buildx.
+The platform that doesn't match your machine is built under QEMU emulation, which is considerably slower.
 ```
-docker buildx build --platform linux/amd64 -t <username>/rocky8-python:amd64 .
-docker push <username>/rocky8-python:amd64
-```
-
-### ARM64
-```
-docker buildx build --platform linux/arm64/v8 -t <username>/rocky8-python:arm64v8 .
-docker push <username>/rocky8-python:arm64v8
+docker buildx create --use
+docker buildx build --platform linux/amd64,linux/arm64 -t <username>/rocky8-python:latest --push .
 ```
 
-### Create manifest
-Manifest is needed to make multi-architecture image available via a single tag.
+Check that both platforms are included:
 ```
-docker manifest create \
-<username>/rocky8-python:latest \
---amend <username>/rocky8-python:amd64 \
---amend <username>/rocky8-python:arm64v8
+docker buildx imagetools inspect <username>/rocky8-python:latest
 ```
 
-Push manifest:
+To build only for the local platform and load the image into the local Docker image store:
 ```
-docker manifest push <username>/rocky8-python:latest
+docker buildx build --load -t rocky8-python .
 ```

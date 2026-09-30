@@ -6,9 +6,26 @@ on:
       - '.github/workflows/build.yml'
   workflow_dispatch:
 
+env:
+  IMAGE: ghcr.io/jurajama/rocky8-python
+
 jobs:
+  # Build each platform natively on its own runner in parallel and push the images by digest only (no tag).
+  # The merge job below combines the digests into a single multi-platform manifest list under the final tag.
   build:
-    runs-on: ubuntu-latest
+    # Only branch pushes and version tags (v*) produce an image.
+    if: startsWith(github.ref, 'refs/heads/') || startsWith(github.ref, 'refs/tags/v')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            platform_pair: linux-amd64
+            runner: ubuntu-24.04
+          - platform: linux/arm64
+            platform_pair: linux-arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
 
     permissions:
       contents: read
@@ -16,56 +33,87 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      uses: docker/setup-buildx-action@v4
 
     - name: Log in to GitHub Container Registry
-      uses: docker/login-action@v3
+      uses: docker/login-action@v4
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
+    - name: Build and push Docker image by digest
+      id: build
+      uses: docker/build-push-action@v7
+      with:
+        context: .
+        platforms: ${{ matrix.platform }}
+        outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+        cache-from: type=gha,scope=${{ github.ref_name }}-${{ matrix.platform_pair }}
+        cache-to: type=gha,mode=max,scope=${{ github.ref_name }}-${{ matrix.platform_pair }}
+        no-cache: ${{ github.ref == 'refs/heads/main' }}
+
+    - name: Export digest
+      run: |
+        mkdir -p ${{ runner.temp }}/digests
+        digest="${{ steps.build.outputs.digest }}"
+        touch "${{ runner.temp }}/digests/${digest#sha256:}"
+
+    - name: Upload digest
+      uses: actions/upload-artifact@v7
+      with:
+        name: digests-${{ matrix.platform_pair }}
+        path: ${{ runner.temp }}/digests/*
+        if-no-files-found: error
+        retention-days: 1
+
+  merge:
+    runs-on: ubuntu-latest
+    needs: build
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
     # This logic of using hard-coded "dev" tag would not work if multiple developers would be working
     # on the same repository on different branches. Then it would be better to use the branch name in tag.
-    - name: Set image tag based on branch
-      id: set_image_tag
+    # If the build was triggered by a tag, the version is extracted from the tag (v1.2.3 -> 1.2.3).
+    - name: Set image tag based on git ref
       run: |
         if [ "${GITHUB_REF}" == "refs/heads/main" ]; then
           echo "image_tag=latest" >> $GITHUB_ENV
         elif [[ "${GITHUB_REF}" == refs/heads/* ]]; then
           echo "image_tag=dev" >> $GITHUB_ENV
+        elif [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+          echo "image_tag=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
         fi
 
-    # If the build was triggered by pushing commits to a branch, push the image with the dev/latest tag.
-    - name: Build and push Docker image with dev/latest tag
-      if: ${{ env.image_tag }}
-      uses: docker/build-push-action@v6
+    - name: Download digests
+      uses: actions/download-artifact@v8
       with:
-        context: .
-        push: true
-        platforms: linux/amd64,linux/arm64
-        tags: ghcr.io/jurajama/rocky8-python:${{ env.image_tag }}
-        cache-from: type=gha,scope=${{ github.ref_name }}
-        cache-to: type=gha,mode=max,scope=${{ github.ref_name }}
-        no-cache: ${{ github.ref == 'refs/heads/main' }}
+        path: ${{ runner.temp }}/digests
+        pattern: digests-*
+        merge-multiple: true
 
-    # If the build was triggered by a tag, extract the version from the tag and push the image with the version tag.
-    - name: Extract version from git tag
-      if: startsWith(github.ref, 'refs/tags/v')
-      id: extract_version
-      run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v4
 
-    - name: Build and push Docker image with version tag
-      if: ${{ env.version }}
-      uses: docker/build-push-action@v6
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v4
       with:
-        context: .
-        push: true
-        platforms: linux/amd64,linux/arm64
-        tags: ghcr.io/jurajama/rocky8-python:${{ env.version }}
-        cache-from: type=gha,scope=${{ github.ref_name }}
-        cache-to: type=gha,mode=max,scope=${{ github.ref_name }}
-        no-cache: ${{ github.ref == 'refs/heads/main' }}
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Create and push multi-platform manifest list
+      working-directory: ${{ runner.temp }}/digests
+      run: |
+        docker buildx imagetools create -t "${IMAGE}:${image_tag}" \
+          $(printf "${IMAGE}@sha256:%s " *)
+
+    - name: Inspect image
+      run: docker buildx imagetools inspect "${IMAGE}:${image_tag}"
