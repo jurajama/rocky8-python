@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - 'Dockerfile'
+      - 'tests/**'
       - '.github/workflows/build.yml'
   workflow_dispatch:
 
@@ -22,9 +23,11 @@ jobs:
           - platform: linux/amd64
             platform_pair: linux-amd64
             runner: ubuntu-24.04
+            machine: x86_64
           - platform: linux/arm64
             platform_pair: linux-arm64
             runner: ubuntu-24.04-arm
+            machine: aarch64
     runs-on: ${{ matrix.runner }}
 
     permissions:
@@ -45,16 +48,37 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Build and push Docker image by digest
+    # Build the image into the local Docker image store first so that it can be tested before it is pushed.
+    - name: Build Docker image for testing
+      uses: docker/build-push-action@v7
+      with:
+        context: .
+        platforms: ${{ matrix.platform }}
+        load: true
+        tags: rocky8-python:test
+        cache-from: type=gha,scope=${{ github.ref_name }}-${{ matrix.platform_pair }}
+        cache-to: type=gha,mode=max,scope=${{ github.ref_name }}-${{ matrix.platform_pair }}
+        no-cache: ${{ github.ref == 'refs/heads/main' }}
+
+    - name: Test Python in the image
+      run: |
+        python_version=$(sed -n 's/^ARG python_version=//p' Dockerfile)
+        docker run --rm \
+          -v "${{ github.workspace }}/tests:/tests:ro" \
+          -e EXPECTED_PYTHON_VERSION="${python_version}" \
+          -e EXPECTED_MACHINE="${{ matrix.machine }}" \
+          rocky8-python:test \
+          python3 -m unittest discover -v -s /tests
+
+    # Only reached if the tests passed. All layers come from the builder's cache of the previous build step,
+    # so this does not rebuild anything (no-cache is intentionally not set here).
+    - name: Push Docker image by digest
       id: build
       uses: docker/build-push-action@v7
       with:
         context: .
         platforms: ${{ matrix.platform }}
         outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
-        cache-from: type=gha,scope=${{ github.ref_name }}-${{ matrix.platform_pair }}
-        cache-to: type=gha,mode=max,scope=${{ github.ref_name }}-${{ matrix.platform_pair }}
-        no-cache: ${{ github.ref == 'refs/heads/main' }}
 
     - name: Export digest
       run: |
