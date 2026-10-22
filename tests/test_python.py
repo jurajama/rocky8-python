@@ -138,5 +138,53 @@ class PackagingTest(unittest.TestCase):
             subprocess.run([venv_python, "-m", "pip", "--version"], check=True, capture_output=True)
 
 
+def _version_tuple(version):
+    return tuple(int(part) for part in version.split(".")[:3])
+
+
+class EmsignIncidentTest(unittest.TestCase):
+    """Checks for the eMudhra/emSign CA incident (CVE-2026-113470).
+
+    pip always trusts its vendored certifi, so it must be new enough not to contain the compromised CAs.
+    """
+
+    MIN_PIP = (26, 2, 2)
+    MIN_CERTIFI = (2026, 10, 19)
+
+    def _pip_version(self, python):
+        out = subprocess.run(
+            [python, "-m", "pip", "--version"], check=True, capture_output=True, text=True,
+        ).stdout
+        return _version_tuple(out.split()[1])
+
+    def test_pip_is_fixed(self):
+        self.assertGreaterEqual(self._pip_version(sys.executable), self.MIN_PIP)
+
+    def test_pip_vendored_certifi_has_no_emsign(self):
+        out = subprocess.run(
+            [sys.executable, "-c", "from pip._vendor import certifi; print(certifi.where())"],
+            check=True, capture_output=True, text=True,
+        ).stdout.strip()
+        with open(out, encoding="utf-8") as f:
+            self.assertNotIn("emSign", f.read())
+
+    def test_venv_pip_is_fixed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            venv_dir = os.path.join(tmp, "venv")
+            subprocess.run([sys.executable, "-m", "venv", venv_dir], check=True)
+            self.assertGreaterEqual(self._pip_version(os.path.join(venv_dir, "bin", "python")), self.MIN_PIP)
+
+    def test_certifi_if_installed_is_fixed(self):
+        try:
+            import certifi
+        except ImportError:
+            self.skipTest("certifi not installed")
+        self.assertGreaterEqual(_version_tuple(certifi.__version__), self.MIN_CERTIFI)
+
+    def test_system_trust_store_has_no_emsign(self):
+        with open("/etc/pki/tls/certs/ca-bundle.crt", encoding="utf-8") as f:
+            self.assertNotIn("emSign", f.read())
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

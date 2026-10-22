@@ -28,6 +28,21 @@ that the extension modules depending on the installed `-devel` packages (`ssl`, 
 work, and that `multiprocessing`, `asyncio`, `pip` and `venv` work. If any test fails, nothing is pushed and the
 tag is not updated.
 
+## eMudhra/emSign CA incident (CVE-2026-113470)
+
+The image is hardened against the eMudhra emSign CA certificate leak, see the
+[Python discussion](https://discuss.python.org/t/information-for-python-users-regarding-emudhra-emsign-ca-certificate-security-incident/109576):
+
+- System `ca-certificates` is updated at build time (`yum update`), which also covers Python's `ssl` module as it
+  uses the system trust store.
+- pip is upgraded to 26.2.2 from a wheel downloaded using the system trust store and verified by SHA256, because
+  pip always trusts its own vendored (previously vulnerable) certifi. The wheel bundled in `ensurepip` is replaced too,
+  so that `python3 -m venv` environments get the fixed pip.
+- The smoke tests check these (`EmsignIncidentTest`). Note: the CVE number could not be verified from public sources
+  when this was written; the mitigations follow the Python advisory.
+
+Rebuild and republish the image to pick up the fix.
+
 ## Testing manually
 
 Run the smoke tests against a locally built image:
