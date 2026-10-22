@@ -145,7 +145,8 @@ def _version_tuple(version):
 class EmsignIncidentTest(unittest.TestCase):
     """Checks for the eMudhra/emSign CA incident (CVE-2026-113470).
 
-    pip always trusts its vendored certifi, so it must be new enough not to contain the compromised CAs.
+    pip always trusts its vendored certifi, so it must be new enough to have the fix. The version is checked rather
+    than the presence of "emSign" certificates, because unaffected emSign roots legitimately remain in the bundles.
     """
 
     MIN_PIP = (26, 2, 2)
@@ -160,14 +161,6 @@ class EmsignIncidentTest(unittest.TestCase):
     def test_pip_is_fixed(self):
         self.assertGreaterEqual(self._pip_version(sys.executable), self.MIN_PIP)
 
-    def test_pip_vendored_certifi_has_no_emsign(self):
-        out = subprocess.run(
-            [sys.executable, "-c", "from pip._vendor import certifi; print(certifi.where())"],
-            check=True, capture_output=True, text=True,
-        ).stdout.strip()
-        with open(out, encoding="utf-8") as f:
-            self.assertNotIn("emSign", f.read())
-
     def test_venv_pip_is_fixed(self):
         with tempfile.TemporaryDirectory() as tmp:
             venv_dir = os.path.join(tmp, "venv")
@@ -180,10 +173,6 @@ class EmsignIncidentTest(unittest.TestCase):
         except ImportError:
             self.skipTest("certifi not installed")
         self.assertGreaterEqual(_version_tuple(certifi.__version__), self.MIN_CERTIFI)
-
-    def test_system_trust_store_has_no_emsign(self):
-        with open("/etc/pki/tls/certs/ca-bundle.crt", encoding="utf-8") as f:
-            self.assertNotIn("emSign", f.read())
 
 
 if __name__ == "__main__":
