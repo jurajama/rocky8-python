@@ -49,7 +49,7 @@ Run the smoke tests against a locally built image:
 ```
 docker run --rm -v "$PWD/tests:/tests:ro" rocky8-python python3 -m unittest discover -v -s /tests
 ```
-Optionally pass `-e EXPECTED_PYTHON_VERSION=3.11.14 -e EXPECTED_MACHINE=x86_64` to enable the version and
+Optionally pass `-e EXPECTED_PYTHON_VERSION=3.11.17 -e EXPECTED_MACHINE=x86_64` to enable the version and
 architecture checks.
 
 ## Building manually

@@ -3,7 +3,7 @@
 Run inside the built image, for example:
 
     docker run --rm -v "$PWD/tests:/tests:ro" \
-        -e EXPECTED_PYTHON_VERSION=3.11.14 -e EXPECTED_MACHINE=x86_64 \
+        -e EXPECTED_PYTHON_VERSION=3.11.17 -e EXPECTED_MACHINE=x86_64 \
         rocky8-python python3 -m unittest discover -v -s /tests
 
 EXPECTED_PYTHON_VERSION and EXPECTED_MACHINE are optional; the corresponding
