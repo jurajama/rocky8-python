@@ -3,7 +3,7 @@
 Run inside the built image, for example:
 
     docker run --rm -v "$PWD/tests:/tests:ro" \
-        -e EXPECTED_PYTHON_VERSION=3.11.14 -e EXPECTED_MACHINE=x86_64 \
+        -e EXPECTED_PYTHON_VERSION=3.11.17 -e EXPECTED_MACHINE=x86_64 \
         rocky8-python python3 -m unittest discover -v -s /tests
 
 EXPECTED_PYTHON_VERSION and EXPECTED_MACHINE are optional; the corresponding
@@ -136,6 +136,43 @@ class PackagingTest(unittest.TestCase):
             ).stdout.strip()
             self.assertEqual(out, "True")
             subprocess.run([venv_python, "-m", "pip", "--version"], check=True, capture_output=True)
+
+
+def _version_tuple(version):
+    return tuple(int(part) for part in version.split(".")[:3])
+
+
+class EmsignIncidentTest(unittest.TestCase):
+    """Checks for the eMudhra/emSign CA incident (CVE-2026-113470).
+
+    pip always trusts its vendored certifi, so it must be new enough to have the fix. The version is checked rather
+    than the presence of "emSign" certificates, because unaffected emSign roots legitimately remain in the bundles.
+    """
+
+    MIN_PIP = (26, 2, 2)
+    MIN_CERTIFI = (2026, 10, 19)
+
+    def _pip_version(self, python):
+        out = subprocess.run(
+            [python, "-m", "pip", "--version"], check=True, capture_output=True, text=True,
+        ).stdout
+        return _version_tuple(out.split()[1])
+
+    def test_pip_is_fixed(self):
+        self.assertGreaterEqual(self._pip_version(sys.executable), self.MIN_PIP)
+
+    def test_venv_pip_is_fixed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            venv_dir = os.path.join(tmp, "venv")
+            subprocess.run([sys.executable, "-m", "venv", venv_dir], check=True)
+            self.assertGreaterEqual(self._pip_version(os.path.join(venv_dir, "bin", "python")), self.MIN_PIP)
+
+    def test_certifi_if_installed_is_fixed(self):
+        try:
+            import certifi
+        except ImportError:
+            self.skipTest("certifi not installed")
+        self.assertGreaterEqual(_version_tuple(certifi.__version__), self.MIN_CERTIFI)
 
 
 if __name__ == "__main__":
