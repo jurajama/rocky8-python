@@ -35,10 +35,10 @@ The image is hardened against the eMudhra emSign CA certificate leak, see the
 
 - System `ca-certificates` is updated at build time (`yum update`), which also covers Python's `ssl` module as it
   uses the system trust store.
-- pip is upgraded to 26.2.2 from a wheel downloaded using the system trust store and verified by SHA256, because
-  pip always trusts its own vendored (previously vulnerable) certifi. The wheel bundled in `ensurepip` is replaced too,
+- pip is upgraded to 26.2.2, because the pip bundled with Python 3.11 (24.0) always trusts its own vendored,
+  vulnerable certifi. The wheel bundled in `ensurepip` is replaced too,
   so that `python3 -m venv` environments get the fixed pip.
-- The smoke tests check these (`EmsignIncidentTest`). Note: the CVE number could not be verified from public sources
+- The smoke tests check the pip versions (`EmsignIncidentTest`). Note: the CVE number could not be verified from public sources
   when this was written; the mitigations follow the Python advisory.
 
 Rebuild and republish the image to pick up the fix.
