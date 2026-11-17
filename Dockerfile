@@ -2,6 +2,11 @@ FROM rockylinux/rockylinux:8.10.20240528
 
 ARG python_version=3.11.17
 
+# Changes daily (set by the build workflow), which invalidates the layer cache from this point onwards so that the
+# base packages and the CA trust store are refreshed at least once per day. Must be referenced in a RUN to take effect.
+ARG build_date=unset
+RUN echo "Build date: ${build_date}"
+
 RUN dnf install -y \
   findutils \
   gzip \
